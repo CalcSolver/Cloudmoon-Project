@@ -1,14 +1,12 @@
-var __defProp = Object.defineProperty;
-var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+// Cloudmoon-InPlay Cloudflare Worker Script
 
-// worker.js
-var worker_default = {
+export default {
   async fetch(request) {
     return handleRequest(request);
   }
 };
 
-var AD_PATTERNS = [
+const AD_PATTERNS = [
   "googlesyndication.com",
   "doubleclick.net",
   "googleadservices.com",
@@ -53,10 +51,10 @@ function isAdRequest(url) {
   const urlLower = url.toLowerCase();
   return AD_PATTERNS.some((pattern) => urlLower.includes(pattern));
 }
-__name(isAdRequest, "isAdRequest");
 
 async function handleRequest(request) {
   const url = new URL(request.url);
+  
   if (url.pathname === "/" || url.pathname === "") {
     return new Response(getMainHTML(), {
       headers: {
@@ -65,11 +63,13 @@ async function handleRequest(request) {
       }
     });
   }
+  
   if (url.pathname === "/manifest.json") {
     return new Response(getManifest(), {
       headers: { "Content-Type": "application/manifest+json" }
     });
   }
+  
   if (url.pathname === "/sw.js") {
     return new Response(getServiceWorker(), {
       headers: {
@@ -78,6 +78,7 @@ async function handleRequest(request) {
       }
     });
   }
+  
   if (url.pathname === "/favicon.png") {
     const iconRes = await fetch("https://ssl.gstatic.com/classroom/favicon.png");
     const iconHeaders = new Headers(iconRes.headers);
@@ -87,27 +88,14 @@ async function handleRequest(request) {
       headers: iconHeaders
     });
   }
-  if (url.pathname === "/icon.svg") {
-    let iconRes = await fetch("https://fonts.gstatic.com/s/i/productlogos/classroom/v8/192px.svg");
-    const isSVG = iconRes.ok;
-    if (!isSVG) {
-      iconRes = await fetch("https://ssl.gstatic.com/classroom/favicon.png");
-    }
-    const iconHeaders = new Headers(iconRes.headers);
-    iconHeaders.set("Content-Type", isSVG ? "image/svg+xml" : "image/png");
-    iconHeaders.set("Cache-Control", "public, max-age=86400");
-    return new Response(iconRes.body, {
-      status: iconRes.status,
-      headers: iconHeaders
-    });
-  }
+
   return proxyCloudMoon(request);
 }
-__name(handleRequest, "handleRequest");
 
 async function proxyCloudMoon(request) {
   const url = new URL(request.url);
   let targetURL;
+  
   if (url.pathname.startsWith("/proxy/")) {
     const encodedURL = url.pathname.substring("/proxy/".length);
     try {
@@ -116,7 +104,6 @@ async function proxyCloudMoon(request) {
         targetURL += url.search;
       }
     } catch (e) {
-      console.error("Failed to decode proxy URL:", encodedURL);
       return new Response("Invalid proxy URL", { status: 400 });
     }
   } else {
@@ -149,7 +136,6 @@ async function proxyCloudMoon(request) {
   try {
     response = await fetch(proxyRequest);
   } catch (error) {
-    console.error("Proxy fetch failed:", error);
     return new Response("Failed to fetch resource", { status: 502 });
   }
 
@@ -167,7 +153,6 @@ async function proxyCloudMoon(request) {
     let html = await response.text();
     html = blockAdsInHTML(html);
     
-    // Injected client-side script for ad blocking, UI fixes, and 28-min timer session rotation
     const injectionCode = `
 <style id="cm-ad-blocker-css">
   .a-div-horizontal, .a-div-vertical, .a-div-placeholder, .a-div-box {
@@ -183,10 +168,7 @@ async function proxyCloudMoon(request) {
 </style>
 <script id="cm-fix-js">
 (function(){
-  // --- 30-MIN TIMER BYPASS / SESSION ROTATION ---
-  // Triggers at 28 minutes to wipe storage and request a brand new clean guest session token
   setTimeout(function() {
-    console.log('[Worker] 28-minute mark reached. Rotating session to bypass time limit...');
     try {
       localStorage.clear();
       sessionStorage.clear();
@@ -197,7 +179,6 @@ async function proxyCloudMoon(request) {
     window.location.reload();
   }, 28 * 60 * 1000);
 
-  // Block ad requests at runtime
   const originalFetch = window.fetch;
   window.fetch = function(...args) {
     const url = args[0];
@@ -260,7 +241,6 @@ async function proxyCloudMoon(request) {
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class"] });
   }
 
-  // Intercept window.open / game streams
   var origOpen = window.open;
   var workerOrigin = window.location.origin;
   function sendGameUrl(url) {
@@ -296,7 +276,6 @@ async function proxyCloudMoon(request) {
     headers: newHeaders
   });
 }
-__name(proxyCloudMoon, "proxyCloudMoon");
 
 function blockAdsInHTML(html) {
   html = html.replace(/<script[^>]*googlesyndication[^>]*>[\s\S]*?<\/script>/gi, "");
@@ -305,7 +284,6 @@ function blockAdsInHTML(html) {
   html = html.replace(/<div[^>]*id="google_ads[^"]*"[^>]*>[\s\S]*?<\/div>/gi, "");
   return html;
 }
-__name(blockAdsInHTML, "blockAdsInHTML");
 
 function getMainHTML() {
   return `<!DOCTYPE html>
@@ -320,27 +298,94 @@ function getMainHTML() {
         #container { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
         #frame-container { flex: 1; width: 100%; height: 100%; background: white; position: relative; }
         iframe { width: 100%; height: 100%; border: none; background: white; outline: none; }
+        #btn-dock { position: fixed; bottom: 18px; left: 18px; display: flex; gap: 10px; z-index: 9999; }
+        .dock-btn { width: 44px; height: 44px; border-radius: 50%; border: none; background: rgba(45, 45, 45, 0.85); color: #e0e0e0; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(0,0,0,0.4); }
+        .dock-btn:hover { background: rgba(74, 74, 74, 0.95); }
     </style>
 </head>
 <body>
     <div id="container">
         <div id="frame-container"></div>
     </div>
+    <div id="btn-dock">
+        <button class="dock-btn" onclick="goBack()" title="Home">🏠</button>
+        <button class="dock-btn" onclick="enterFullscreen()" title="Fullscreen">⛶</button>
+    </div>
     <script>
         const frameContainer = document.getElementById('frame-container');
         let mainURL = '/web.cloudmoonapp.com/';
-        
-        function loadCloudMoon() {
+        let currentIframe = null;
+        const SHADOW_LAYERS = 4;
+
+        function createMultiLayerShadowFrame(url) {
             frameContainer.innerHTML = '';
-            let iframe = document.createElement('iframe');
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = 'none';
-            iframe.src = mainURL;
-            frameContainer.appendChild(iframe);
+            let currentHost = document.createElement('div');
+            currentHost.style.width = '100%';
+            currentHost.style.height = '100%';
+            frameContainer.appendChild(currentHost);
+            
+            for (let i = 0; i < SHADOW_LAYERS; i++) {
+                const shadowRoot = currentHost.attachShadow({ mode: 'closed' });
+                if (i < SHADOW_LAYERS - 1) {
+                    const nextHost = document.createElement('div');
+                    nextHost.style.width = '100%';
+                    nextHost.style.height = '100%';
+                    shadowRoot.appendChild(nextHost);
+                    currentHost = nextHost;
+                } else {
+                    const iframe = document.createElement('iframe');
+                    iframe.style.width = '100%';
+                    iframe.style.height = '100%';
+                    iframe.style.border = 'none';
+                    iframe.setAttribute('sandbox', 'allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-downloads allow-pointer-lock allow-top-navigation-by-user-activation');
+                    iframe.setAttribute('allow', 'accelerometer; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; clipboard-read; clipboard-write; xr-spatial-tracking; gamepad');
+                    iframe.src = url;
+                    shadowRoot.appendChild(iframe);
+                    currentIframe = iframe;
+                }
+            }
         }
-        loadCloudMoon();
+
+        createMultiLayerShadowFrame(mainURL);
+
+        function goBack() {
+            createMultiLayerShadowFrame(mainURL);
+        }
+
+        function enterFullscreen() {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            }
+        }
+
+        window.addEventListener('message', (event) => {
+            if (event.origin !== window.location.origin) return;
+            if (event.data && event.data.type === 'LOAD_GAME') {
+                createMultiLayerShadowFrame(event.data.url);
+            }
+        });
     </script>
 </body>
 </html>`;
+}
+
+function getManifest() {
+  return JSON.stringify({
+    name: "CloudMoon",
+    short_name: "CloudMoon",
+    start_url: "/",
+    display: "standalone",
+    background_color: "#0d1117",
+    theme_color: "#2d2d2d"
+  });
+}
+
+function getServiceWorker() {
+  return `
+    self.addEventListener('install', (e) => self.skipWaiting());
+    self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
+    self.addEventListener('fetch', (e) => {
+      e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    });
+  `;
 }
