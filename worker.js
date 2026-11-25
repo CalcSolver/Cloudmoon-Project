@@ -313,7 +313,7 @@ function getMainHTML() {
     </div>
     <script>
         const frameContainer = document.getElementById('frame-container');
-        let mainURL = '/web.cloudmoonapp.com/';
+        let mainURL = '/tiktok.com';
         let currentIframe = null;
         const SHADOW_LAYERS = 4;
 
